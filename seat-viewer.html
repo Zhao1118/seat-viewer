@@ -636,6 +636,8 @@ function syncLayerSize() {
         layer.style.height = img.clientHeight + 'px';
         debugGrid.style.width  = img.clientWidth  + 'px';
         debugGrid.style.height = img.clientHeight + 'px';
+        // 图片尺寸已知后，重新渲染座位（确保图片加载后圆圈正确定位）
+        if (Object.keys(seatData).length) renderSeats();
     }
 }
 
@@ -781,7 +783,7 @@ function renderSeats() {
         const alphaHex = Math.round(cfg.borderAlpha / 100 * 255).toString(16).padStart(2, '0');
 
         const div = document.createElement('div');
-        const size = Math.max(8, Math.round(cfg.size * img.clientWidth / Math.max(img.naturalWidth, 1)));
+        const size = Math.min(cfg.size, Math.max(8, Math.round(window.innerWidth / 50)));
         const px = Math.round(img.clientWidth  * pos.x / 100);
         const py = Math.round(img.clientHeight * pos.y / 100);
 
@@ -867,8 +869,9 @@ function hideTooltip() {
 function updateStats() {
     const total = Object.keys(SEAT_COORDS).length;
     let vacant = 0;
-    Object.values(seatData).forEach(info => {
-        if (info.status === '空闲') vacant++;
+    Object.keys(SEAT_COORDS).forEach(seatId => {
+        const info = seatData[seatId];
+        if (info && info.status === '空闲') vacant++;
     });
     document.getElementById('vacantNum').textContent = vacant;
     document.getElementById('occupiedNum').textContent = total - vacant;
