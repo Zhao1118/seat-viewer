@@ -329,9 +329,9 @@ body {
             <div class="sp-group-title">尺寸</div>
             <div class="sp-row">
                 <label>圆圈大小</label>
-                <input type="range" id="slSize" min="14" max="60" value="28"
+                <input type="range" id="slSize" min="8" max="40" value="18"
                        oninput="onSettingChange('size', this.value)">
-                <span class="val-label" id="valSize">28px</span>
+                <span class="val-label" id="valSize">18px</span>
             </div>
             <div class="sp-row">
                 <label>边框粗细</label>
@@ -483,7 +483,9 @@ const SEAT_COORDS = {
 // ====== 座位样式设置 ======
 const DEFAULTS = {
     showNum:     false,
-    size:        28,
+    size:        18,
+    minSize:     8,
+    maxSize:     40,
     border:      2,
     colorVacant:   '#52c41a',
     colorOccupied: '#ff4d4f',
