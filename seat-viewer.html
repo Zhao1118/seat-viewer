@@ -541,7 +541,7 @@ function onSettingChange(key, val) {
     } else if (key === 'colorVacant') {
         cfg.colorVacant = val;
     } else if (key === 'colorOccupied') {
-        cfg.colorExpiring = val;
+        cfg.colorOccupied = val;
     } else if (key === 'colorBorder') {
         cfg.colorBorder = val;
     } else if (key === 'borderAlpha') {
@@ -781,7 +781,7 @@ function renderSeats() {
         const alphaHex = Math.round(cfg.borderAlpha / 100 * 255).toString(16).padStart(2, '0');
 
         const div = document.createElement('div');
-        const size = cfg.size;
+        const size = Math.max(8, Math.round(cfg.size * img.clientWidth / Math.max(img.naturalWidth, 1)));
         const px = Math.round(img.clientWidth  * pos.x / 100);
         const py = Math.round(img.clientHeight * pos.y / 100);
 
