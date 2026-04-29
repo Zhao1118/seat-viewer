@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <title>小新自习室 · 实时座位</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -266,6 +266,7 @@ body {
 <div class="map-wrap">
     <div class="map-container" id="mapContainer">
         <img src="1店座位图.jpg" alt="座位图" id="bgImg"
+             style="max-width: 100%; height: auto;"
              onerror="this.style.display='none';document.getElementById('noImg').classList.add('show')">
         <div class="no-img" id="noImg">
             <div style="font-size:48px">🗺️</div>
