@@ -741,6 +741,23 @@ async function refreshData() {
 }
 
 function parseData(result) {
+    // 新代理直接返回 JSON 对象，字段名已对齐：status/name/start/end/days/remaining/note
+    if (typeof result === 'object' && !Array.isArray(result) && result !== null) {
+        const data = {};
+        for (const [seatId, info] of Object.entries(result)) {
+            if (!seatId || isNaN(parseInt(seatId))) continue;
+            data[seatId] = {
+                status: info.status || '空闲',
+                name: info.name || '',
+                start: info.startTime || info.start || '',
+                end: info.endTime || info.end || '',
+                days: info.remaining || info.days || '',
+                note: info.note || ''
+            };
+        }
+        return data;
+    }
+    // 旧 CSV 格式（已不使用，兜底）
     const data = {};
     const rows = result.csv_data.trim().split('\n');
     for (let i = 1; i < rows.length; i++) {
