@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小新自习室 · 实时座位</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+.header {
+    background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%);
+    color: white;
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+    box-shadow: 0 2px 8px rgba(24,144,255,0.3);
+}
+.header .title { font-size: 18px; font-weight: bold; }
+.header .subtitle { font-size: 12px; opacity: 0.85; }
+.header .stats { display: flex; gap: 16px; font-size: 14px; }
+.btn-row { display: flex; gap: 8px; align-items: center; }
+.btn {
+    padding: 6px 16px; background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4); border-radius: 20px;
+    color: white; cursor: pointer; font-size: 13px; font-family: inherit; transition: 0.2s;
+}
+.btn:hover { background: rgba(255,255,255,0.3); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-gear {
+    padding: 5px 12px; background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 5px;
+    font-size: 16px; line-height: 1; min-width: 36px; text-align: center;
+}
+.btn-gear:hover { background: rgba(255,255,255,0.3); }
+.btn-gear.active { background: rgba(255,255,255,0.4); }
+
+/* 地图 */
+.map-wrap {
+    flex: 1; display: flex; justify-content: center;
+    align-items: flex-start; padding: 16px; overflow: auto;
+}
+.map-container {
+    position: relative; display: inline-block; line-height: 0;
+}
+.map-container img {
+    display: block;
+    border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+/* 调试网格 */
+.debug-grid {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 50; display: none;
+}
+.debug-grid.show { display: block; }
+.debug-line-h, .debug-line-v {
+    position: absolute; background: rgba(255,255,0,0.4);
+}
+.debug-line-h { width: 100%; height: 1px; left: 0; }
+.debug-line-v { height: 100%; width: 1px; top: 0; }
+.debug-label {
+    position: absolute; font-size: 10px; color: #ff0;
+    background: rgba(0,0,0,0.5); padding: 1px 3px; border-radius: 2px;
+    pointer-events: none;
+}
+
+/* 座位圆圈 */
+.seat-marker {
+    position: absolute; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 10;
+}
+.seat-marker:hover {
+    transform: translate(-50%, -50%) scale(1.2);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    z-index: 100;
+}
+
+/* 设置面板 */
+.settings-panel {
+    position: fixed; top: 0; right: -300px;
+    width: 280px; height: 100vh;
+    background: rgba(22,33,62,0.97);
+    color: white;
+    z-index: 9998;
+    transition: right 0.25s ease;
+    display: flex; flex-direction: column;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.4);
+    border-left: 1px solid rgba(255,255,255,0.08);
+}
+.settings-panel.open { right: 0; }
+.settings-panel .sp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.settings-panel .sp-header h3 { font-size: 15px; color: #ffd700; }
+.settings-panel .sp-header .close-btn {
+    background: none; border: none; color: #aaa; font-size: 22px;
+    cursor: pointer; padding: 0; line-height: 1;
+}
+.settings-panel .sp-header .close-btn:hover { color: white; }
+.settings-panel .sp-body {
+    flex: 1; overflow-y: auto; padding: 12px 16px 16px;
+}
+.settings-panel .sp-group {
+    margin-bottom: 16px;
+}
+.settings-panel .sp-group-title {
+    font-size: 11px; color: #888; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.settings-panel .sp-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; gap: 8px;
+}
+.settings-panel .sp-row label { font-size: 13px; color: #ccc; flex-shrink: 0; }
+.settings-panel .sp-row input[type="range"] {
+    flex: 1; accent-color: #1890ff; cursor: pointer;
+}
+.settings-panel .sp-row .val-label {
+    font-size: 12px; color: #7ee787; min-width: 36px; text-align: right;
+}
+.settings-panel .sp-row input[type="color"] {
+    width: 36px; height: 28px; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px; cursor: pointer; padding: 2px; background: transparent;
+}
+.settings-panel .sp-toggle {
+    display: flex; gap: 8px; margin-bottom: 10px;
+}
+.settings-panel .sp-toggle button {
+    flex: 1; padding: 5px 0; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 5px; background: rgba(255,255,255,0.05);
+    color: #aaa; font-size: 13px; cursor: pointer; font-family: inherit;
+    transition: 0.15s;
+}
+.settings-panel .sp-toggle button.on {
+    background: rgba(24,144,255,0.35);
+    border-color: #1890ff; color: white;
+}
+
+/* 弹窗 */
+.tooltip {
+    position: fixed; background: rgba(22,33,62,0.96); color: white;
+    padding: 12px 16px; border-radius: 10px; font-size: 13px;
+    z-index: 9999; pointer-events: none; max-width: 230px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.1); display: none;
+}
+.tooltip.show { display: block; }
+.tooltip .tip-title { font-weight: bold; font-size: 15px; margin-bottom: 8px; color: #ffd700; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; }
+.tooltip .tip-row { margin: 3px 0; line-height: 1.4; }
+.tooltip .tip-label { color: #aaa; margin-right: 6px; }
+.tip-vacant { color: #7ee787; font-weight: bold; }
+.tip-occupied { color: #ff7875; font-weight: bold; }
+
+/* 加载遮罩 */
+.loading-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); display: flex; align-items: center;
+    justify-content: center; z-index: 10000;
+}
+.loading-overlay .spinner {
+    width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2);
+    border-top-color: #1890ff; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-overlay p { color: white; margin-top: 14px; font-size: 14px; }
+
+.no-img {
+    width: 600px; height: 400px; background: #1a1a2e; color: #555;
+    display: none; align-items: center; justify-content: center;
+    font-size: 18px; border-radius: 8px; flex-direction: column; gap: 12px;
+}
+.no-img.show { display: flex; }
+
+/* 调试面板 */
+.debug-panel {
+    position: fixed; top: 70px; right: 10px;
+    background: rgba(22,33,62,0.95); color: white;
+    padding: 12px; border-radius: 8px; font-size: 12px;
+    z-index: 200; display: none; min-width: 200px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.debug-panel.show { display: block; }
+.debug-panel h4 { margin-bottom: 8px; color: #ffd700; }
+.debug-panel p { margin: 3px 0; color: #aaa; }
+.debug-panel .val { color: #7ee787; }
+
+.footer { text-align: center; padding: 6px; font-size: 11px; color: #999; }
+.hide { display: none !important; }
+</style>
+</head>
+<body>
+<div id="loginModal" style="
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;
+    z-index:99999;
+">
+    <div style="background:rgba(22,33,62,0.98);color:white;padding:30px 40px;border-radius:12px;
+                box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center;min-width:320px;">
+        <div style="font-size:32px;margin-bottom:10px;">🔐</div>
+        <h3 style="margin-bottom:20px;color:#ffd700;">管理员登录</h3>
+        <input type="password" id="adminPwd" placeholder="请输入密码"
+               style="width:100%;padding:10px 14px;border:1px solid rgba(255,255,255,0.3);
+                      border-radius:6px;background:rgba(255,255,255,0.1);color:white;
+                      font-size:14px;box-sizing:border-box;margin-bottom:16px;">
+        <div style="display:flex;gap:10px;">
+            <button onclick="login()" style="flex:1;padding:10px;border:none;border-radius:6px;
+                                         background:#1890ff;color:white;font-size:14px;cursor:pointer;">
+                登录
+            </button>
+            <button onclick="document.getElementById('adminPwd').value=''" style="flex:1;padding:10px;
+                    border:1px solid rgba(255,255,255,0.3);border-radius:6px;background:transparent;
+                    color:#aaa;font-size:14px;cursor:pointer;">
+                清空
+            </button>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#888;"><div style="display:flex;gap:10px;margin-top:14px;">
+            <button onclick="enterStudentMode()" style="flex:1;padding:10px;border:1px solid rgba(255,255,255,0.3);
+                    border-radius:6px;background:transparent;color:#7ee787;font-size:14px;cursor:pointer;">
+                👀 我是学生
+            </button>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#888;">学生可直接查看座位状态</div></div>
+    </div>
+</div>
+
+
+<div class="header">
+    <div>
+        <div class="title">📚 小新自习室 · 1店实时座位</div>
+        <div class="subtitle">数据来源：腾讯文档 · 与 <code style="background:rgba(255,255,255,0.2);padding:1px 4px;border-radius:3px">1店座位图.jpg</code> 同目录</div>
+    </div>
+    <div class="stats">
+        <span>🟢 空闲 <b id="vacantNum">-</b> 个</span>
+        <span>🔴 已订 <b id="occupiedNum">-</b> 个</span>
+        <span>共 <b id="totalNum">-</b> 席</span>
+    </div>
+    <div id="adminBadge" style="display:none;background:rgba(255,215,0,0.2);
+                border:1px solid rgba(255,215,0,0.4);padding:4px 12px;border-radius:20px;
+                font-size:12px;color:#ffd700;">
+                👑 管理员
+                <span style="margin-left:8px;cursor:pointer;color:#aaa;" onclick="logout()">[退出]</span>
+            </div>
+
+    <div class="btn-row">
+        <button class="btn btn-gear" id="settingsBtn" onclick="toggleSettings()" title="座位样式设置" style="display:none;">⚙️</button>
+        <button class="btn" id="debugBtn" onclick="toggleDebug()" style="display:none;">🔍 调试</button>
+        <button class="btn" id="adminLoginBtn" onclick="showLoginModal()" style="display:inline-block;">🔐 管理员</button>
+        <button class="btn" id="refreshBtn" onclick="refreshData()">🔄 刷新</button>
+    </div>
+</div>
+
+<div class="map-wrap">
+    <div class="map-container" id="mapContainer">
+        <img src="1店座位图.jpg" alt="座位图" id="bgImg"
+             onerror="this.style.display='none';document.getElementById('noImg').classList.add('show')">
+        <div class="no-img" id="noImg">
+            <div style="font-size:48px">🗺️</div>
+            <div>请把 <b style="color:#ffd700">1店座位图.jpg</b> 放在同一文件夹</div>
+        </div>
+        <div class="debug-grid" id="debugGrid"></div>
+        <div id="seatLayer"></div>
+    </div>
+</div>
+
+<!-- 调试面板 -->
+<div class="debug-panel" id="debugPanel">
+    <h4>🔍 诊断信息</h4>
+    <p>图片尺寸：<span class="val" id="dbgImgSize">-</span></p>
+    <p>容器尺寸：<span class="val" id="dbgContSize">-</span></p>
+    <p>缩放比例：<span class="val" id="dbgScale">-</span></p>
+    <p>代理状态：<span class="val" id="dbgProxy">-</span></p>
+    <hr style="border-color:#333;margin:8px 0">
+    <p style="color:#888;font-size:11px">打开调试网格可验证圆圈是否对齐座位位置</p>
+</div>
+
+<!-- 弹窗 -->
+<div class="tooltip" id="tooltip">
+    <div class="tip-title" id="tipTitle"></div>
+    <div class="tip-row" id="tipStatus"></div>
+    <div class="tip-row" id="tipName"></div>
+    <div class="tip-row" id="tipPeriod"></div>
+    <div class="tip-row" id="tipDays"></div>
+    <div class="tip-row" id="tipNote"></div>
+</div>
+
+<div class="loading-overlay hide" id="loadingOverlay">
+    <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="spinner"></div>
+        <p>加载座位数据...</p>
+    </div>
+</div>
+
+<div class="footer" id="footerText">最后刷新：-</div>
+
+<!-- 设置面板 -->
+<div class="settings-panel" id="settingsPanel">
+    <div class="sp-header">
+        <h3>🎨 座位样式设置</h3>
+        <button class="close-btn" onclick="toggleSettings()">✕</button>
+    </div>
+    <div class="sp-body">
+
+        <!-- 显示选项 -->
+        <div class="sp-group">
+            <div class="sp-group-title">显示选项</div>
+            <div class="sp-toggle">
+                <button id="btnShowNum" onclick="setShowNum(true)">显示编号</button>
+                <button id="btnHideNum" onclick="setShowNum(false)">隐藏编号</button>
+            </div>
+        </div>
+
+        <!-- 尺寸 -->
+        <div class="sp-group">
+            <div class="sp-group-title">尺寸</div>
+            <div class="sp-row">
+                <label>圆圈大小</label>
+                <input type="range" id="slSize" min="14" max="60" value="28"
+                       oninput="onSettingChange('size', this.value)">
+                <span class="val-label" id="valSize">28px</span>
+            </div>
+            <div class="sp-row">
+                <label>边框粗细</label>
+                <input type="range" id="slBorder" min="0" max="8" value="2"
+                       oninput="onSettingChange('border', this.value)">
+                <span class="val-label" id="valBorder">2px</span>
+            </div>
+        </div>
+
+        <!-- 颜色 -->
+        <div class="sp-group">
+            <div class="sp-group-title">颜色</div>
+            <div class="sp-row">
+                <label>🟢 空闲色</label>
+                <input type="color" id="colorVacant" value="#52c41a"
+                       oninput="onSettingChange('colorVacant', this.value)">
+            </div>
+            <div class="sp-row">
+                <label>🔴 已订色</label>
+                <input type="color" id="colorOccupied" value="#ff4d4f"
+                       oninput="onSettingChange('colorOccupied', this.value)">
+            </div>
+            <div class="sp-row">
+                <label>边框色</label>
+                <input type="color" id="colorBorder" value="#ffffff"
+                       oninput="onSettingChange('colorBorder', this.value)">
+            </div>
+        </div>
+
+        <!-- 透明度 -->
+        <div class="sp-group">
+            <div class="sp-group-title">视觉效果</div>
+            <div class="sp-row">
+                <label>边框透明度</label>
+                <input type="range" id="slBorderAlpha" min="0" max="100" value="70"
+                       oninput="onSettingChange('borderAlpha', this.value)">
+                <span class="val-label" id="valBorderAlpha">70%</span>
+            </div>
+            <div class="sp-row">
+                <label>悬停放大</label>
+                <input type="range" id="slHoverScale" min="110" max="200" value="120"
+                       oninput="onSettingChange('hoverScale', this.value)">
+                <span class="val-label" id="valHoverScale">1.2x</span>
+            </div>
+        </div>
+
+        <!-- 重置 -->
+        <div class="sp-group">
+            <button onclick="resetSettings()" style="
+                width:100%; padding:8px; border:1px solid rgba(255,255,255,0.2);
+                border-radius:6px; background:rgba(255,255,255,0.05);
+                color:#aaa; font-size:13px; cursor:pointer; font-family:inherit;
+            ">↺ 恢复默认设置</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+// ====== 管理员系统 ======
+let isAdmin = false;
+const ADMIN_PASSWORD = '991118';
+
+function login() {
+    const pwd = document.getElementById('adminPwd').value;
+    if (pwd === ADMIN_PASSWORD) {
+        isAdmin = true;
+        document.getElementById('loginModal').style.display = 'none';
+        document.getElementById('adminLoginBtn').style.display = 'none';
+        document.getElementById('adminBadge').style.display = 'block';
+        document.getElementById('settingsBtn').style.display = 'inline-block';
+        document.getElementById('debugBtn').style.display = 'inline-block';
+        renderSeats();
+    } else {
+        alert('密码错误！');
+    }
+}
+
+function logout() {
+    isAdmin = false;
+    document.getElementById('adminBadge').style.display = 'none';
+    document.getElementById('adminLoginBtn').style.display = 'inline-block';
+    document.getElementById('settingsBtn').style.display = 'none';
+    document.getElementById('debugBtn').style.display = 'none';
+    // 关闭设置面板
+    const panel = document.getElementById('settingsPanel');
+    if (panel.classList.contains('open')) toggleSettings();
+    // 关闭调试
+    if (debugMode) toggleDebug();
+    renderSeats();
+}
+
+// 学生模式入口
+function enterStudentMode() {
+    document.getElementById('loginModal').style.display = 'none';
+    isAdmin = false;
+    document.getElementById('adminLoginBtn').style.display = 'inline-block';
+    renderSeats();
+}
+
+// 显示管理员登录弹窗
+function showLoginModal() {
+    document.getElementById('loginModal').style.display = 'flex';
+    document.getElementById('adminPwd').focus();
+}
+
+// 回车登录
+document.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const modal = document.getElementById('loginModal');
+        if (modal && modal.style.display !== 'none') {
+            login();
+        }
+    }
+});
+
+// ====== 配置 ======
+const API_BASE = 'http://localhost:38080';
+// 不再自动刷新，仅页面打开时和手动点击刷新按钮时获取数据
+
+const SEAT_COORDS = {
+    "1":  {x: 13.4, y: 54.2},
+    "2":  {x: 19.6, y: 54.2},
+    "3":  {x: 26.7, y: 54.2},
+    "4":  {x: 33.3, y: 54.2},
+    "5":  {x: 40.5, y: 54.2},
+    "6":  {x: 47.8, y: 54.2},
+    "7":  {x: 70.2, y: 54.3},
+    "8":  {x: 76.5, y: 54.2},
+    "9":  {x: 83.9, y: 54.2},
+    "10": {x: 90.2, y: 54.2},
+    "11": {x: 13.4, y: 95.5},
+    "12": {x: 19.9, y: 95.4},
+    "13": {x: 26.9, y: 95.4},
+    "14": {x: 33.5, y: 95.4},
+    "16": {x: 11.5, y: 13.4},
+    "17": {x: 17.9, y: 13.4},
+    "18": {x: 25.0, y: 13.4},
+    "19": {x: 31.7, y: 13.4},
+    "20": {x: 38.8, y: 13.4},
+    "21": {x: 11.5, y: 40.7},
+    "22": {x: 18.1, y: 40.7},
+    "23": {x: 25.0, y: 40.7},
+    "24": {x: 31.7, y: 40.7},
+    "25": {x: 38.8, y: 40.7},
+};
+
+// ====== 座位样式设置 ======
+const DEFAULTS = {
+    showNum:     false,
+    size:        28,
+    border:      2,
+    colorVacant:   '#52c41a',
+    colorOccupied: '#ff4d4f',
+    colorBorder:   '#ffffff',
+    borderAlpha: 70,
+    hoverScale:  120,
+};
+
+let cfg = { ...DEFAULTS };
+
+function loadSettings() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('seatViewerCfg') || 'null');
+        if (saved) cfg = { ...DEFAULTS, ...saved };
+    } catch(e) {}
+}
+
+function saveSettings() {
+    localStorage.setItem('seatViewerCfg', JSON.stringify(cfg));
+}
+
+// ====== 设置面板 UI 同步 ======
+function syncUI() {
+    document.getElementById('slSize').value = cfg.size;
+    document.getElementById('valSize').textContent = cfg.size + 'px';
+    document.getElementById('slBorder').value = cfg.border;
+    document.getElementById('valBorder').textContent = cfg.border + 'px';
+    document.getElementById('colorVacant').value = cfg.colorVacant;
+    document.getElementById('colorOccupied').value = cfg.colorOccupied;
+    document.getElementById('colorBorder').value = cfg.colorBorder;
+    document.getElementById('slBorderAlpha').value = cfg.borderAlpha;
+    document.getElementById('valBorderAlpha').textContent = cfg.borderAlpha + '%';
+    document.getElementById('slHoverScale').value = cfg.hoverScale;
+    document.getElementById('valHoverScale').textContent = (cfg.hoverScale / 100).toFixed(1) + 'x';
+    setShowNum(cfg.showNum);
+}
+
+function setShowNum(on) {
+    cfg.showNum = on;
+    document.getElementById('btnShowNum').className = on ? 'on' : '';
+    document.getElementById('btnHideNum').className = !on ? 'on' : '';
+    saveSettings();
+    if (Object.keys(seatData).length) renderSeats();
+}
+
+function onSettingChange(key, val) {
+    if (key === 'size') {
+        cfg.size = parseInt(val);
+        document.getElementById('valSize').textContent = val + 'px';
+    } else if (key === 'border') {
+        cfg.border = parseInt(val);
+        document.getElementById('valBorder').textContent = val + 'px';
+    } else if (key === 'colorVacant') {
+        cfg.colorVacant = val;
+    } else if (key === 'colorOccupied') {
+        cfg.colorExpiring = val;
+    } else if (key === 'colorBorder') {
+        cfg.colorBorder = val;
+    } else if (key === 'borderAlpha') {
+        cfg.borderAlpha = parseInt(val);
+        document.getElementById('valBorderAlpha').textContent = val + '%';
+    } else if (key === 'hoverScale') {
+        cfg.hoverScale = parseInt(val);
+        document.getElementById('valHoverScale').textContent = (val / 100).toFixed(1) + 'x';
+    }
+    saveSettings();
+    if (Object.keys(seatData).length) renderSeats();
+}
+
+function resetSettings() {
+    cfg = { ...DEFAULTS };
+    saveSettings();
+    syncUI();
+    if (Object.keys(seatData).length) renderSeats();
+}
+
+// ====== 面板开关 ======
+function toggleSettings() {
+    const panel = document.getElementById('settingsPanel');
+    const btn = document.getElementById('settingsBtn');
+    const open = panel.classList.toggle('open');
+    btn.classList.toggle('active', open);
+}
+
+// ====== 启动 ======
+let seatData = {};
+let debugMode = false;
+
+window.addEventListener('load', async () => {
+    loadSettings();
+    syncUI();
+    const img = document.getElementById('bgImg');
+    if (img.complete) {
+        init();
+    } else {
+        img.addEventListener('load', init);
+        img.addEventListener('error', init);
+    }
+});
+
+async function init() {
+    syncLayerSize();
+    window.addEventListener('resize', syncLayerSize);
+    updateDebugInfo();
+
+    // 先用缓存数据立刻渲染座位，不等网络
+    try {
+        const cached = localStorage.getItem('seatDataCache');
+        if (cached) {
+            seatData = JSON.parse(cached);
+            const cacheTime = localStorage.getItem('seatCacheTime');
+            const ago = cacheTime ? Math.round((Date.now() - parseInt(cacheTime)) / 60000) : '?';
+            document.getElementById('footerText').textContent = '📋 缓存数据（' + ago + '分钟前），正在刷新…';
+        }
+    } catch(e) {}
+    renderSeats();
+    updateStats();
+
+    // 后台静默拉取最新数据，不阻塞页面
+    try {
+        const res = await fetch(API_BASE + '/seat-data');
+        if (res.ok) {
+            const result = await res.json();
+            seatData = parseData(result);
+            renderSeats();
+            updateStats();
+            try { localStorage.setItem('seatDataCache', JSON.stringify(seatData)); localStorage.setItem('seatCacheTime', Date.now().toString()); } catch(e){}
+            document.getElementById('dbgProxy').textContent = '✅ 在线';
+            document.getElementById('footerText').textContent = '最后刷新：' + new Date().toLocaleString('zh-CN');
+        } else {
+            throw new Error('HTTP ' + res.status);
+        }
+    } catch (e) {
+        document.getElementById('dbgProxy').textContent = '❌ 未启动';
+        if (!Object.keys(seatData).length) {
+            document.getElementById('footerText').textContent = '❌ 加载失败: ' + e.message;
+        }
+    }
+}
+
+// ====== 同步层尺寸 ======
+function syncLayerSize() {
+    const img = document.getElementById('bgImg');
+    const layer = document.getElementById('seatLayer');
+    const debugGrid = document.getElementById('debugGrid');
+    if (img.clientWidth > 0 && img.clientHeight > 0) {
+        layer.style.width  = img.clientWidth  + 'px';
+        layer.style.height = img.clientHeight + 'px';
+        debugGrid.style.width  = img.clientWidth  + 'px';
+        debugGrid.style.height = img.clientHeight + 'px';
+    }
+}
+
+function updateDebugInfo() {
+    const img = document.getElementById('bgImg');
+    const cont = document.getElementById('mapContainer');
+    const w = img.naturalWidth  || img.clientWidth;
+    const h = img.naturalHeight || img.clientHeight;
+    const cw = cont.clientWidth;
+    const ch = cont.clientHeight;
+    document.getElementById('dbgImgSize').textContent  = w + ' × ' + h + ' px';
+    document.getElementById('dbgContSize').textContent = cw + ' × ' + ch + ' px';
+    document.getElementById('dbgScale').textContent    = (w > 0 && cw > 0) ? (cw / w).toFixed(3) + 'x' : '-';
+}
+
+// ====== 调试网格 ======
+function toggleDebug() {
+    debugMode = !debugMode;
+    const btn = document.getElementById('debugBtn');
+    const grid = document.getElementById('debugGrid');
+    const panel = document.getElementById('debugPanel');
+    if (debugMode) {
+        btn.classList.add('active');
+        grid.classList.add('show');
+        panel.classList.add('show');
+        renderDebugGrid();
+    } else {
+        btn.classList.remove('active');
+        grid.classList.remove('show');
+        panel.classList.remove('show');
+    }
+    updateDebugInfo();
+}
+
+function renderDebugGrid() {
+    const grid = document.getElementById('debugGrid');
+    grid.innerHTML = '';
+    const lines = [25, 50, 75];
+    lines.forEach(pct => {
+        const hLine = document.createElement('div');
+        hLine.className = 'debug-line-h';
+        hLine.style.top = pct + '%';
+        grid.appendChild(hLine);
+        const vLine = document.createElement('div');
+        vLine.className = 'debug-line-v';
+        vLine.style.left = pct + '%';
+        grid.appendChild(vLine);
+        const lbl = document.createElement('div');
+        lbl.className = 'debug-label';
+        lbl.textContent = pct + '%';
+        lbl.style.left = '2px';
+        lbl.style.top = pct + '%';
+        grid.appendChild(lbl);
+    });
+    const center = document.createElement('div');
+    center.style.cssText = 'position:absolute;left:50%;top:50%;width:8px;height:8px;background:#f00;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:60';
+    grid.appendChild(center);
+    [[0,0],[0,100],[100,0],[100,100]].forEach(([x,y]) => {
+        const dot = document.createElement('div');
+        dot.style.cssText = `position:absolute;left:${x}%;top:${y}%;width:8px;height:8px;background:#0ff;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:60`;
+        grid.appendChild(dot);
+    });
+}
+
+// ====== 刷新 ======
+async function refreshData() {
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 刷新中';
+    try {
+        const res = await fetch(API_BASE + '/seat-data');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const result = await res.json();
+        seatData = parseData(result);
+        renderSeats();
+        updateStats();
+        try { localStorage.setItem('seatDataCache', JSON.stringify(seatData)); localStorage.setItem('seatCacheTime', Date.now().toString()); } catch(e){}
+        document.getElementById('dbgProxy').textContent = '✅ 在线';
+        document.getElementById('footerText').textContent = '最后刷新：' + new Date().toLocaleString('zh-CN');
+    } catch (e) {
+        console.error(e);
+        try {
+            const cached = localStorage.getItem('seatDataCache');
+            const cacheTime = localStorage.getItem('seatCacheTime');
+            if (cached) {
+                seatData = JSON.parse(cached);
+                renderSeats();
+                updateStats();
+                const ago = cacheTime ? Math.round((Date.now() - parseInt(cacheTime)) / 60000) : '?';
+                document.getElementById('footerText').textContent = '⚠️ 使用缓存数据（' + ago + '分钟前）';
+            } else {
+                document.getElementById('footerText').textContent = '❌ 加载失败: ' + e.message;
+            }
+        } catch(e2) {
+            document.getElementById('footerText').textContent = '❌ 加载失败: ' + e.message;
+        }
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 刷新';
+    }
+}
+
+function parseData(result) {
+    const data = {};
+    const rows = result.csv_data.trim().split('\n');
+    for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i].split(',');
+        if (cols.length < 8) continue;
+        const seatId = cols[0].trim();
+        const status = cols[2].trim();
+        if (!seatId || isNaN(parseInt(seatId))) continue;
+        data[seatId] = {
+            status,
+            name: cols[3].trim(),
+            start: cols[4].trim(),
+            end: cols[5].trim(),
+            days: cols[7].trim(),
+            note: cols[8] ? cols[8].trim() : ''
+        };
+    }
+    return data;
+}
+
+// ====== 渲染座位 ======
+function renderSeats() {
+    const img   = document.getElementById('bgImg');
+    const layer = document.getElementById('seatLayer');
+    layer.innerHTML = '';
+    layer.style.cssText = 'position:absolute;top:0;left:0;';
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // 根据配置计算悬停缩放
+    const hoverTransform = `translate(-50%,-50%) scale(${cfg.hoverScale / 100})`;
+
+    Object.entries(SEAT_COORDS).forEach(([seatId, pos]) => {
+        const info = seatData[seatId] || {};
+        const status = info.status || '空闲';
+        const isVacant = status === '空闲';
+
+        const bgColor = isVacant ? cfg.colorVacant : cfg.colorOccupied;
+        const alphaHex = Math.round(cfg.borderAlpha / 100 * 255).toString(16).padStart(2, '0');
+
+        const div = document.createElement('div');
+        const size = cfg.size;
+        const px = Math.round(img.clientWidth  * pos.x / 100);
+        const py = Math.round(img.clientHeight * pos.y / 100);
+
+        div.style.cssText = [
+            'position:absolute',
+            `left:${px}px`,
+            `top:${py}px`,
+            `width:${size}px`,
+            `height:${size}px`,
+            `transform:translate(-50%,-50%)`,
+            `border-radius:50%`,
+            `background:${bgColor}`,
+            `display:flex`,
+            `align-items:center`,
+            `justify-content:center`,
+            `font-size:${Math.max(9, Math.round(size * 0.38))}px`,
+            `font-weight:bold`,
+            `color:white`,
+            `cursor:pointer`,
+            `box-shadow:0 2px 6px rgba(0,0,0,0.25)`,
+            `border:${cfg.border}px solid ${cfg.colorBorder}${alphaHex}`,
+            `transition:transform 0.15s,box-shadow 0.15s`,
+            `z-index:10`,
+            `pointer-events:all`,
+            `user-select:none`
+        ].join(';');
+
+        if (cfg.showNum) div.textContent = seatId;
+
+        // 悬停效果
+        div.addEventListener('mouseenter', e => {
+            div.style.transform = hoverTransform;
+            div.style.boxShadow = '0 4px 14px rgba(0,0,0,0.35)';
+            div.style.zIndex = '100';
+            showTooltip(e, seatId, info);
+        });
+        div.addEventListener('mousemove', moveTooltip);
+        div.addEventListener('mouseleave', () => {
+            div.style.transform = 'translate(-50%,-50%)';
+            div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+            div.style.zIndex = '10';
+            hideTooltip();
+        });
+
+        layer.appendChild(div);
+    });
+}
+
+// ====== 弹窗 ======
+function showTooltip(e, seatId, info) {
+    const tip = document.getElementById('tooltip');
+    const status = info.status || '空闲';
+    const isVacant = status === '空闲';
+    document.getElementById('tipTitle').textContent = `📌 ${seatId}号座位`;
+    document.getElementById('tipStatus').innerHTML =
+        `<span class="tip-label">状态：</span><span class="${isVacant ? 'tip-vacant' : 'tip-occupied'}">${status}</span>`;
+    document.getElementById('tipName').innerHTML = (isAdmin && info.name)
+        ? `<span class="tip-label">会员：</span>${info.name}` : '';
+    document.getElementById('tipPeriod').innerHTML = (isAdmin && (info.start || info.end))
+        ? `<span class="tip-label">时段：</span>${info.start || '?'} ~ ${info.end || '?'}` : '';
+    document.getElementById('tipDays').innerHTML = (isAdmin && info.days)
+        ? `<span class="tip-label">剩余：</span>${info.days}` : '';
+    document.getElementById('tipNote').innerHTML = (isAdmin && info.note)
+        ? `<span class="tip-label">备注：</span>${info.note}` : '';
+    moveTooltip(e);
+    tip.classList.add('show');
+}
+
+function moveTooltip(e) {
+    const tip = document.getElementById('tooltip');
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + tip.offsetWidth > window.innerWidth - 10) x = e.clientX - tip.offsetWidth - 14;
+    if (y + tip.offsetHeight > window.innerHeight - 10) y = e.clientY - tip.offsetHeight - 14;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+}
+
+function hideTooltip() {
+    document.getElementById('tooltip').classList.remove('show');
+}
+
+// ====== 统计 ======
+function updateStats() {
+    const total = Object.keys(SEAT_COORDS).length;
+    let vacant = 0;
+    Object.values(seatData).forEach(info => {
+        if (info.status === '空闲') vacant++;
+    });
+    document.getElementById('vacantNum').textContent = vacant;
+    document.getElementById('occupiedNum').textContent = total - vacant;
+    document.getElementById('totalNum').textContent = total;
+}
+</script>
+</body>
+</html>
