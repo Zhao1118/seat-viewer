@@ -735,19 +735,6 @@ async function refreshData() {
 }
 
 // parseData 函数已移除 - 直接使用 JSON 数据
-        const status = cols[2].trim();
-        if (!seatId || isNaN(parseInt(seatId))) continue;
-        data[seatId] = {
-            status,
-            name: cols[3].trim(),
-            start: cols[4].trim(),
-            end: cols[5].trim(),
-            days: cols[7].trim(),
-            note: cols[8] ? cols[8].trim() : ''
-        };
-    }
-    return data;
-}
 
 // ====== 渲染座位 ======
 function renderSeats() {
