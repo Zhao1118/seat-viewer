@@ -8,7 +8,8 @@ const fs = require('fs');
 
 const FILE_ID = 'fTYDtoctXaVu';
 const SHEET_ID = 'BB08J2';
-const TOKEN = process.env.TENCENT_DOCS_TOKEN;
+// 硬编码 Token 测试（确认 API 是否正常）
+const TOKEN = process.env.TENCENT_DOCS_TOKEN || 'ea47a9f01f3e4900882706154cb747c3';
 
 if (!TOKEN) {
   console.error('TENCENT_DOCS_TOKEN not set');
@@ -16,11 +17,11 @@ if (!TOKEN) {
 }
 
 // 清理 Token（去掉可能的空格/换行/特殊字符）
-const cleanToken = TOKEN.trim().replace(/[\r\n\x00-\x1F]/g, '');
+const cleanToken = TOKEN.trim().replace(/[\r\n\x00-\x1F\x7F]/g, '');
 
 console.log('Fetching seats data from Tencent Docs...');
 console.log(`File: ${FILE_ID}, Sheet: ${SHEET_ID}`);
-console.log(`Token length: ${cleanToken.length}`);
+console.log(`Token: ${cleanToken}`);
 
 const url = `https://docs.qq.com/sheet/api/v3/sheets/${SHEET_ID}/data?file_id=${FILE_ID}&reader_client_version=1`;
 
