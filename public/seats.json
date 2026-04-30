@@ -48,9 +48,9 @@
     "type": "沉浸式",
     "status": "已订",
     "name": "NGC2237",
-    "startTime": "2026/5/2",
+    "startTime": "2026/5/1",
     "endTime": "2026/5/4",
-    "days": "3天",
+    "days": "4天",
     "remaining": "剩余4天",
     "note": ""
   },
@@ -178,12 +178,12 @@
   "18": {
     "seatId": "18",
     "type": "半沉浸",
-    "status": "空闲",
-    "name": "",
+    "status": "已订",
+    "name": "我的id是江南美人",
     "startTime": "",
-    "endTime": "",
+    "endTime": "2026/5/1",
     "days": "",
-    "remaining": "",
+    "remaining": "剩余1天",
     "note": ""
   },
   "19": {
