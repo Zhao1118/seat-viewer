@@ -18,9 +18,6 @@ jobs:
         with:
           node-version: '20'
           
-      - name: Install mcporter
-        run: npm install -g mcporter
-        
       - name: Fetch seats data
         env:
           TENCENT_DOCS_TOKEN: ${{ secrets.TENCENT_DOCS_TOKEN }}
