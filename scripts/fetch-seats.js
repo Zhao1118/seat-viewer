@@ -1,9 +1,9 @@
 /**
  * fetch-seats.js - 获取腾讯文档座位数据
- * 用于 GitHub Actions
+ * 用于 GitHub Actions（直接 HTTPS 请求，不依赖 mcporter）
  */
 
-const { execSync } = require('child_process');
+const https = require('https');
 const fs = require('fs');
 
 const FILE_ID = 'fTYDtoctXaVu';
@@ -18,74 +18,79 @@ if (!TOKEN) {
 console.log('Fetching seats data from Tencent Docs...');
 console.log(`File: ${FILE_ID}, Sheet: ${SHEET_ID}`);
 
-try {
-  // 使用 mcporter 获取数据
-  const args = JSON.stringify({
-    file_id: FILE_ID,
-    sheet_id: SHEET_ID,
-    start_row: 0,
-    start_col: 0,
-    end_row: 30,
-    end_col: 8,
-    return_csv: true
+// 构建 API URL
+const url = `https://docs.qq.com/sheet/api/v3/sheets/${SHEET_ID}/data?file_id=${FILE_ID}&reader_client_version=1`;
+
+const options = {
+  method: 'GET',
+  headers: {
+    'Cookie': `openToken=${TOKEN}`,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  }
+};
+
+https.get(url, options, (res) => {
+  let data = '';
+  
+  res.on('data', chunk => {
+    data += chunk;
   });
   
-  const result = execSync(
-    `mcporter call tencent-docs sheet.get_cell_data --args '${args}'`,
-    {
-      env: { ...process.env, TENCENT_DOCS_TOKEN: TOKEN },
-      encoding: 'utf-8',
-      timeout: 60000
+  res.on('end', () => {
+    try {
+      const response = JSON.parse(data);
+      
+      if (response.retcode && response.retcode !== 0) {
+        console.error('❌ API error:', response.retmsg || response);
+        process.exit(1);
+      }
+      
+      // 解析数据
+      const sheetData = response.data || response;
+      const rows = sheetData.rows || sheetData.initialSortedRowData?.rows || [];
+      
+      if (!rows || rows.length === 0) {
+        console.error('❌ No data rows found');
+        console.log('Response keys:', Object.keys(response));
+        process.exit(1);
+      }
+      
+      const seats = {};
+      
+      // 跳过表头，从第2行开始
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i].cells || rows[i].values || rows[i];
+        if (!cols || cols.length < 4) continue;
+        
+        const seatId = (cols[0]?.value || cols[0] || '').toString().trim();
+        const name = (cols[3]?.value || cols[3] || '').toString().trim();
+        
+        if (!seatId || isNaN(parseInt(seatId))) continue;
+        
+        seats[seatId] = {
+          seatId: seatId,
+          type: (cols[1]?.value || cols[1] || '普通').toString().trim(),
+          status: name ? '已订' : '空闲',
+          name: name || '',
+          startTime: (cols[4]?.value || cols[4] || '').toString().trim(),
+          endTime: (cols[5]?.value || cols[5] || '').toString().trim(),
+          days: (cols[6]?.value || cols[6] || '').toString().trim(),
+          remaining: (cols[7]?.value || cols[7] || '').toString().trim(),
+          note: (cols[8]?.value || cols[8] || '').toString().trim()
+        };
+      }
+      
+      fs.writeFileSync('public/seats.json', JSON.stringify(seats, null, 2));
+      console.log(`✅ Updated ${Object.keys(seats).length} seats`);
+      console.log('Saved to public/seats.json');
+      
+    } catch (e) {
+      console.error('❌ Parse error:', e.message);
+      console.log('Response (first 500 chars):', data.substring(0, 500));
+      process.exit(1);
     }
-  );
-  
-  const response = JSON.parse(result);
-  
-  if (response.error) {
-    console.error('❌ API error:', response.error);
-    process.exit(1);
-  }
-  
-  const csvData = response.csv_data || response.data?.csv_data;
-  
-  if (!csvData) {
-    console.error('❌ No csv_data in response');
-    console.log('Response:', JSON.stringify(response, null, 2).substring(0, 500));
-    process.exit(1);
-  }
-  
-  // 解析 CSV
-  const rows = csvData.split('\n');
-  const seats = {};
-  
-  for (let i = 1; i < rows.length; i++) {
-    const cols = rows[i].split(',');
-    if (cols.length < 4) continue;
-    
-    const seatId = cols[0]?.trim();
-    const name = cols[3]?.trim();
-    
-    if (!seatId || isNaN(parseInt(seatId))) continue;
-    
-    seats[seatId] = {
-      seatId: seatId,
-      type: cols[1]?.trim() || '普通',
-      status: name ? '已订' : '空闲',
-      name: name || '',
-      startTime: cols[4]?.trim() || '',
-      endTime: cols[5]?.trim() || '',
-      days: cols[6]?.trim() || '',
-      remaining: cols[7]?.trim() || '',
-      note: cols[8]?.trim() || ''
-    };
-  }
-  
-  fs.writeFileSync('public/seats.json', JSON.stringify(seats, null, 2));
-  console.log(`✅ Updated ${Object.keys(seats).length} seats`);
-  console.log('Saved to public/seats.json');
-  
-} catch (e) {
-  console.error('❌ Error:', e.message);
-  if (e.stderr) console.error('stderr:', e.stderr.toString());
+  });
+}).on('error', (e) => {
+  console.error('❌ Request error:', e.message);
   process.exit(1);
-}
+});
