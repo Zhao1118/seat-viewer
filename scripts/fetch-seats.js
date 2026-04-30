@@ -11,20 +11,23 @@ const SHEET_ID = 'BB08J2';
 const TOKEN = process.env.TENCENT_DOCS_TOKEN;
 
 if (!TOKEN) {
-  console.error('❌ TENCENT_DOCS_TOKEN not set');
+  console.error('TENCENT_DOCS_TOKEN not set');
   process.exit(1);
 }
 
+// 清理 Token（去掉可能的空格/换行/特殊字符）
+const cleanToken = TOKEN.trim().replace(/[\r\n\x00-\x1F]/g, '');
+
 console.log('Fetching seats data from Tencent Docs...');
 console.log(`File: ${FILE_ID}, Sheet: ${SHEET_ID}`);
+console.log(`Token length: ${cleanToken.length}`);
 
-// 构建 API URL
 const url = `https://docs.qq.com/sheet/api/v3/sheets/${SHEET_ID}/data?file_id=${FILE_ID}&reader_client_version=1`;
 
 const options = {
   method: 'GET',
   headers: {
-    'Cookie': `openToken=${TOKEN}`,
+    'Cookie': `openToken=${cleanToken}`,
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
   }
 };
