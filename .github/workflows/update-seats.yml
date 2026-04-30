@@ -40,7 +40,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add public/seats.json
+          git add seats.json
           git diff --quiet && git diff --staged --quiet || git commit -m "Update seats data [skip ci]"
           git push
           

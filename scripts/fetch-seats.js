@@ -12,12 +12,8 @@ const SHEET_ID = 'BB08J2';
 
 // 工作目录为脚本所在目录的父目录
 const workDir = path.resolve(__dirname, '..');
-const publicDir = path.join(workDir, 'public');
-
-// 确保 public 目录存在
-if (!fs.existsSync(publicDir)) {
-  fs.mkdirSync(publicDir, { recursive: true });
-}
+// seats.json 放在根目录，GitHub Pages 从根目录提供文件
+const outputDir = workDir;
 
 console.log('Fetching seats data from Tencent Docs via mcporter...');
 console.log(`File: ${FILE_ID}, Sheet: ${SHEET_ID}`);
@@ -84,9 +80,9 @@ try {
     };
   }
   
-  fs.writeFileSync(path.join(publicDir, 'seats.json'), JSON.stringify(seats, null, 2));
+  fs.writeFileSync(path.join(outputDir, 'seats.json'), JSON.stringify(seats, null, 2));
   console.log(`✅ Updated ${Object.keys(seats).length} seats`);
-  console.log('Saved to public/seats.json');
+  console.log('Saved to seats.json');
   
 } catch (e) {
   console.error('❌ Error:', e.message);
