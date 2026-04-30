@@ -449,11 +449,8 @@ document.addEventListener('keypress', function(e) {
 });
 
 // ====== 配置 ======
-// GitHub Actions 触发 URL（用于手动刷新）
-const GITHUB_REPO = 'Zhao1118/seat-viewer';
-const GITHUB_TOKEN = ''; // 可选：如果仓库是私有的，需要填入 token
-// 数据文件路径
-const SEATS_DATA_URL = 'seats.json';
+const API_BASE = '/api';
+// 不再自动刷新，仅页面打开时和手动点击刷新按钮时获取数据
 
 const SEAT_COORDS = {
     "1":  {x: 13.4, y: 54.2},
@@ -604,8 +601,26 @@ async function init() {
     renderSeats();
     updateStats();
 
-    // 后台静默拉取最新数据（从 seats.json）
-    await refreshData();
+    // 后台静默拉取最新数据，不阻塞页面
+    try {
+        const res = await fetch(API_BASE + '/seat-data');
+        if (res.ok) {
+            const result = await res.json();
+            seatData = parseData(result);
+            renderSeats();
+            updateStats();
+            try { localStorage.setItem('seatDataCache', JSON.stringify(seatData)); localStorage.setItem('seatCacheTime', Date.now().toString()); } catch(e){}
+            document.getElementById('dbgProxy').textContent = '✅ 在线';
+            document.getElementById('footerText').textContent = '最后刷新：' + new Date().toLocaleString('zh-CN');
+        } else {
+            throw new Error('HTTP ' + res.status);
+        }
+    } catch (e) {
+        document.getElementById('dbgProxy').textContent = '❌ 未启动';
+        if (!Object.keys(seatData).length) {
+            document.getElementById('footerText').textContent = '❌ 加载失败: ' + e.message;
+        }
+    }
 }
 
 // ====== 同步层尺寸 ======
@@ -685,30 +700,18 @@ function renderDebugGrid() {
 // ====== 刷新 ======
 async function refreshData() {
     const btn = document.getElementById('refreshBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = '⏳ 刷新中';
-    }
-    
+    btn.disabled = true;
+    btn.textContent = '⏳ 刷新中';
     try {
-        // 从 seats.json 读取数据
-        const res = await fetch(SEATS_DATA_URL + '?t=' + Date.now()); // 加时间戳避免缓存
+        const res = await fetch(API_BASE + '/seat-data');
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        
         const result = await res.json();
-        seatData = result; // 直接使用 JSON 对象
+        seatData = parseData(result);
         renderSeats();
         updateStats();
-        
-        // 缓存到 localStorage
-        try { 
-            localStorage.setItem('seatDataCache', JSON.stringify(seatData)); 
-            localStorage.setItem('seatCacheTime', Date.now().toString()); 
-        } catch(e){}
-        
+        try { localStorage.setItem('seatDataCache', JSON.stringify(seatData)); localStorage.setItem('seatCacheTime', Date.now().toString()); } catch(e){}
         document.getElementById('dbgProxy').textContent = '✅ 在线';
         document.getElementById('footerText').textContent = '最后刷新：' + new Date().toLocaleString('zh-CN');
-        
     } catch (e) {
         console.error(e);
         try {
@@ -727,14 +730,18 @@ async function refreshData() {
             document.getElementById('footerText').textContent = '❌ 加载失败: ' + e.message;
         }
     } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = '🔄 刷新';
-        }
+        btn.disabled = false;
+        btn.textContent = '🔄 刷新';
     }
 }
 
-// parseData 函数已移除 - 直接使用 JSON 数据
+function parseData(result) {
+    const data = {};
+    const rows = result.csv_data.trim().split('\n');
+    for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i].split(',');
+        if (cols.length < 8) continue;
+        const seatId = cols[0].trim();
         const status = cols[2].trim();
         if (!seatId || isNaN(parseInt(seatId))) continue;
         data[seatId] = {
