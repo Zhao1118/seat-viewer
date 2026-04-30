@@ -18,9 +18,19 @@ jobs:
         with:
           node-version: '20'
           
-      - name: Fetch seats data
+      - name: Install mcporter
+        run: npm install -g mcporter
+        
+      - name: Configure Tencent Docs token
         env:
           TENCENT_DOCS_TOKEN: ${{ secrets.TENCENT_DOCS_TOKEN }}
+        run: |
+          mcporter config add tencent-docs "https://docs.qq.com/openapi/mcp" \
+            --header "Authorization=$TENCENT_DOCS_TOKEN" \
+            --transport http \
+            --scope home
+        
+      - name: Fetch seats data
         run: node scripts/fetch-seats.js
         
       - name: Commit and push
