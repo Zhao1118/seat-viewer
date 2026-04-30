@@ -5,6 +5,9 @@ on:
   repository_dispatch:
     types: [refresh-seats]
 
+permissions:
+  contents: write
+
 jobs:
   update-seats:
     runs-on: ubuntu-latest
