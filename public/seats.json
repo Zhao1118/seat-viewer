@@ -7,7 +7,7 @@
     "startTime": "2026/5/1",
     "endTime": "2026/5/4",
     "days": "4天",
-    "remaining": "剩余3天",
+    "remaining": "剩余2天",
     "note": ""
   },
   "2": {
@@ -40,7 +40,7 @@
     "startTime": "2026/5/1",
     "endTime": "2026/5/2",
     "days": "2天",
-    "remaining": "剩余1天",
+    "remaining": "剩余0天",
     "note": "擦"
   },
   "5": {
@@ -62,7 +62,7 @@
     "startTime": "",
     "endTime": "2026/5/2",
     "days": "",
-    "remaining": "剩余1天",
+    "remaining": "剩余0天",
     "note": ""
   },
   "7": {
@@ -106,7 +106,7 @@
     "startTime": "2026/4/30",
     "endTime": "2026/5/29",
     "days": "30天",
-    "remaining": "剩余28天",
+    "remaining": "剩余27天",
     "note": ""
   },
   "11": {
@@ -128,7 +128,7 @@
     "startTime": "2026/5/2",
     "endTime": "2026/5/3",
     "days": "2天",
-    "remaining": "剩余2天",
+    "remaining": "剩余1天",
     "note": ""
   },
   "13": {
@@ -150,7 +150,7 @@
     "startTime": "2026/5/1",
     "endTime": "2026/5/3",
     "days": "3天",
-    "remaining": "剩余2天",
+    "remaining": "剩余1天",
     "note": ""
   },
   "16": {
@@ -183,7 +183,7 @@
     "startTime": "",
     "endTime": "2026/5/2",
     "days": "",
-    "remaining": "剩余1天",
+    "remaining": "剩余0天",
     "note": ""
   },
   "19": {
@@ -205,7 +205,7 @@
     "startTime": "2026/5/1",
     "endTime": "2026/5/5",
     "days": "5天",
-    "remaining": "剩余4天",
+    "remaining": "剩余3天",
     "note": ""
   },
   "21": {
@@ -227,7 +227,7 @@
     "startTime": "2026/5/1",
     "endTime": "2026/5/4",
     "days": "4天",
-    "remaining": "剩余3天",
+    "remaining": "剩余2天",
     "note": ""
   },
   "23": {
@@ -260,7 +260,7 @@
     "startTime": "2026/5/1",
     "endTime": "2026/5/2",
     "days": "2天",
-    "remaining": "剩余1天",
+    "remaining": "剩余0天",
     "note": ""
   }
 }
