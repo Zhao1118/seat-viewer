@@ -1,51 +1,34 @@
 name: Update Seats Data
 
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'  # 每5分钟运行一次
   repository_dispatch:
-    types: [refresh-seats]
+    types: [update-seats]   # 前端手动触发
+  workflow_dispatch:         # GitHub UI 手动触发
 
 permissions:
   contents: write
 
 jobs:
-  update-seats:
+  update:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
-      - name: Install mcporter
-        run: npm install -g mcporter
-        
-      - name: Configure Tencent Docs token
+
+      - name: Fetch seats data from Feishu
         env:
-          TENCENT_DOCS_TOKEN: ${{ secrets.TENCENT_DOCS_TOKEN }}
-        run: |
-          mcporter config add tencent-docs "https://docs.qq.com/openapi/mcp" \
-            --header "Authorization=$TENCENT_DOCS_TOKEN" \
-            --transport http \
-            --scope home
-        
-      - name: Fetch seats data
+          FEISHU_APP_ID: cli_a97e4dd4ca78dbb4
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          SEATS_OUTPUT_PATH: seats.json
         run: node scripts/fetch-seats.js
-        
-      - name: Commit and push
+
+      - name: Commit and push if changed
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add seats.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update seats data [skip ci]"
-          git push
-          
-      - name: Summary
-        if: success()
-        run: |
-          echo "✅ Seats data updated!"
-          echo "📍 View: https://zhao1118.github.io/seat-viewer/"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git diff --quiet seats.json || (git add seats.json && git commit -m "🔄 auto-update seats data $(date -u +'%Y-%m-%d %H:%M UTC')" && git push)
