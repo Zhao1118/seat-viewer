@@ -1,91 +1,117 @@
-/**
- * fetch-seats.js - 获取腾讯文档座位数据
- * 使用 mcporter CLI 调用腾讯文档 MCP API
- */
+// fetch-seats.js — 从飞书多维表格获取座位数据，输出 seats.json
+// 用于 GitHub Actions 定时运行
 
-const { execSync } = require('child_process');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const FILE_ID = 'fTYDtoctXaVu';
-const SHEET_ID = 'BB08J2';
+const APP_ID = process.env.FEISHU_APP_ID || 'cli_a97e4dd4ca78dbb4';
+const APP_SECRET = process.env.FEISHU_APP_SECRET || '';
+const BITABLE_APP_TOKEN = 'FVN6bZd4AaPZw2sUotxcYGSUnIc';
+const TABLE_ID = 'tblVM1qbql7ZNflw';
 
-// 工作目录为脚本所在目录的父目录
-const workDir = path.resolve(__dirname, '..');
-// seats.json 放在根目录，GitHub Pages 从根目录提供文件
-const outputDir = workDir;
-
-console.log('Fetching seats data from Tencent Docs via mcporter...');
-console.log(`File: ${FILE_ID}, Sheet: ${SHEET_ID}`);
-
-try {
-  // 使用 mcporter 调用腾讯文档 API（Windows 用双引号）
-  const args = JSON.stringify({
-    file_id: FILE_ID,
-    sheet_id: SHEET_ID,
-    start_row: 0,
-    start_col: 0,
-    end_row: 30,
-    end_col: 10,
-    return_csv: true
+function httpsPost(hostname, ppath, body) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const req = https.request({
+      hostname, path: ppath, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, res => {
+      let b = '';
+      res.on('data', d => b += d);
+      res.on('end', () => { try { resolve(JSON.parse(b)); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
   });
-  
-  const result = execSync(
-    `mcporter call tencent-docs sheet.get_cell_data --args "${args.replace(/"/g, '\\"')}"`,
-    { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+}
+
+function httpsGet(hostname, ppath, token) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname, path: ppath, method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
+    }, res => {
+      let b = '';
+      res.on('data', d => b += d);
+      res.on('end', () => { try { resolve(JSON.parse(b)); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function main() {
+  if (!APP_SECRET) {
+    console.error('FEISHU_APP_SECRET not set');
+    process.exit(1);
+  }
+
+  // 1. 获取 tenant_access_token
+  console.log('Getting tenant_access_token...');
+  const tokenRes = await httpsPost('open.feishu.cn', '/open-apis/auth/v3/tenant_access_token/internal/', {
+    app_id: APP_ID,
+    app_secret: APP_SECRET
+  });
+  if (tokenRes.code !== 0) {
+    console.error('Failed to get token:', tokenRes);
+    process.exit(1);
+  }
+  const token = tokenRes.tenant_access_token;
+  console.log('Token obtained successfully');
+
+  // 2. 获取多维表格记录
+  console.log('Fetching bitable records...');
+  const recordsRes = await httpsGet('open.feishu.cn',
+    `/open-apis/bitable/v1/apps/${BITABLE_APP_TOKEN}/tables/${TABLE_ID}/records?page_size=100`,
+    token
   );
-  
-  const response = JSON.parse(result);
-  
-  if (response.error) {
-    console.error('❌ API error:', response.error);
+  if (recordsRes.code !== 0) {
+    console.error('Failed to fetch records:', recordsRes);
     process.exit(1);
   }
-  
-  const csvData = response.csv_data;
-  if (!csvData) {
-    console.error('❌ No csv_data in response');
-    process.exit(1);
-  }
-  
-  // 解析 CSV
-  const lines = csvData.trim().split('\n');
-  if (lines.length < 2) {
-    console.error('❌ Not enough data rows');
-    process.exit(1);
-  }
-  
+
+  // 3. 转换数据格式
   const seats = {};
-  
-  // 跳过表头，从第2行开始
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
-    if (cols.length < 4) continue;
+  const items = recordsRes.data.items || [];
+  items.forEach(item => {
+    const f = item.fields;
+    const seatId = String(f['座位号'] || '').trim();
+    if (!seatId) return;
     
-    const seatId = cols[0].trim();
-    if (!seatId || isNaN(parseInt(seatId))) continue;
+    // 判断状态：有预定人姓名 → 已订，无 → 空闲
+    const name = String(f['预定人微信名'] || '').trim();
+    const statusCol = String(f['座位状态'] || '').trim();
+    const isOccupied = name.length > 0 || statusCol === '已预定' || statusCol === '使用中';
     
-    const name = cols[3].trim();
+    // 格式化时间
+    const startTime = f['开始时间'] ? new Date(f['开始时间']).toLocaleDateString('zh-CN') : '';
+    const endTime = f['结束时间'] ? new Date(f['结束时间']).toLocaleDateString('zh-CN') : '';
     
     seats[seatId] = {
-      seatId: seatId,
-      type: cols[1].trim() || '普通',
-      status: name ? '已订' : '空闲',
-      name: name || '',
-      startTime: cols[4].trim() || '',
-      endTime: cols[5].trim() || '',
-      days: cols[6].trim() || '',
-      remaining: cols[7].trim() || '',
-      note: cols[8].trim() || ''
+      status: isOccupied ? statusCol || '已预定' : '空闲',
+      name: name,
+      start: startTime,
+      end: endTime,
+      days: String(f['剩余天数'] !== undefined ? f['剩余天数'] : ''),
+      note: String(f['备注'] || '').trim()
     };
-  }
-  
-  fs.writeFileSync(path.join(outputDir, 'seats.json'), JSON.stringify(seats, null, 2));
-  console.log(`✅ Updated ${Object.keys(seats).length} seats`);
-  console.log('Saved to seats.json');
-  
-} catch (e) {
-  console.error('❌ Error:', e.message);
-  if (e.stderr) console.error('stderr:', e.stderr);
-  process.exit(1);
+  });
+
+  // 4. 输出 seats.json
+  const outputPath = process.env.SEATS_OUTPUT_PATH || path.join(__dirname, '..', 'seats.json');
+  const output = {
+    updated: new Date().toISOString(),
+    seats: seats
+  };
+  fs.writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf-8');
+  console.log(`Seats data written to ${outputPath}`);
+  console.log(`Total seats: ${Object.keys(seats).length}`);
+  console.log(`Occupied: ${Object.values(seats).filter(s => s.status !== '空闲').length}`);
 }
+
+main().catch(e => {
+  console.error('Error:', e);
+  process.exit(1);
+});
