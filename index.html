@@ -200,7 +200,7 @@ body {
 <div class="header">
     <div>
         <div class="title">📚 小新自习室 · 实时座位</div>
-        <div class="subtitle">数据来源：飞书多维表格 · 每5分钟自动刷新</div>
+        <div class="subtitle">数据来源：飞书多维表格 · 打开即最新 ✨</div>
     </div>
     <div class="stats">
         <span>🟢 空闲 <b id="vacantNum">-</b> 个</span>
@@ -401,7 +401,7 @@ function resetSettings() { cfg = { ...DEFAULTS }; saveSettings(); syncUI(); if (
 function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('open'); }
 
 // ====== 数据加载 ======
-const SEATS_JSON_URL = 'seats.json';
+const WORKER_URL = 'https://tiny-band-0cfb.1415873267.workers.dev/seats';
 
 async function loadSeatsData() {
     try {
@@ -416,8 +416,8 @@ async function loadSeatsData() {
             document.getElementById('footerText').textContent = '📋 缓存数据（' + ago + '分钟前），正在刷新…';
         }
 
-        // 拉取最新
-        const res = await fetch(SEATS_JSON_URL + '?t=' + Date.now());
+        // 从 Cloudflare Worker 拉取最新数据（实时）
+        const res = await fetch(WORKER_URL + '?t=' + Date.now());
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const result = await res.json();
 
